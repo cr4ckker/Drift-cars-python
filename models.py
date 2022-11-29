@@ -1,7 +1,11 @@
 import numpy as np
-import random
+import numba
+import random, keyboard
 
 from math import cos, sin, radians
+from funcs import Normalize, rotate
+
+direction = np.array([0.0, 1.0])
 
 class Car:
     Type = 'car'
@@ -42,13 +46,37 @@ class Car:
         self.render = list(map(lambda point: [self.x + point[0], self.y + point[1]], self.map))
         self.lines = self.GetLines(self.render)
     
+    def CreateMove(self):
+        self.vector = Normalize(self.vector*4*self.velocity**2 + self.direction)
+        if keyboard.is_pressed('f5'):
+            self.pos = np.array([500, 500], dtype='float64')
+            self.x, self.y = self.pos
+        if keyboard.is_pressed(self.keys[0]):
+            self.velocity += (self.speed - self.velocity) * 0.01
+        if keyboard.is_pressed(self.keys[1]):
+            self.velocity += (-self.speed/3 - self.velocity) * 0.01
+        if keyboard.is_pressed(self.keys[2]):
+            self.rotation -= min(2 * self.velocity/self.speed*1.5, 2)
+            self.wheel_angle = max(-50 * (abs(self.velocity)/self.speed)*1.5, -50)
+        if keyboard.is_pressed(self.keys[3]):
+            self.rotation += min(2 * self.velocity/self.speed*1.5, 2)
+            self.wheel_angle = min(50 * (abs(self.velocity)/self.speed)*1.5, 50)
+        if not keyboard.is_pressed(self.keys[3]) and not keyboard.is_pressed(self.keys[2]):
+            self.wheel_angle *= 0.9
+        
+        if self.velocity > 0.001 or self.velocity < -0.001:
+            self.direction = rotate(self.rotation, *direction, *[0,0,0,0])
+            self.velocity *= 0.995
+            self.pos += self.vector * self.velocity
+            self.x, self.y = self.pos
+
     def Render(self, canvas):
         for wheel in self.wheels:
             wheel.Render(canvas, self.GetCenter(self.GetMap()), [min(self.wheel_angle, 45.0), self.rotation], self.drift_angle)
         render = self.GetMap()
         center = self.GetCenter(render)
         back = self.GetBackAxis(render)
-        self.render = list(map(lambda line: [(back[0] - line[0]) * cos(radians(self.rotation)) - (back[1] - line[1]) * sin(radians(self.rotation)) + center[0], (back[0] - line[0]) * sin(radians(self.rotation)) + (back[1] - line[1]) * cos(radians(self.rotation)) + center[1]], render))
+        self.render = [rotate(self.rotation, *point, *center, *back) for point in render]
         canvas.create_polygon(*self.render, fill=self.color)
 
     def GetLines(self, obj):
@@ -59,7 +87,7 @@ class Car:
     
     def GetBackAxis(self, obj):
         return self.GetCenter(obj) - [0, self.length/2]
-    
+
     def GetMap(self):
         return list(map(lambda point: [self.x + point[0], self.y + point[1]], self.map))
 
@@ -76,32 +104,41 @@ class Smoke:
         self.color_change_velocity = random.randint(3,5)
         self.color = 102
         self.alive = True
+        self.map = [
+                [0, 0],
+                [self.size, 0],
+                [self.size, self.size],
+                [0, self.size]
+                ]
+        self.render = self.GetMap()
 
     def Render(self, canvas):
         if self.alive:
-            self.size += self.size_transform_velocity / 2
-            self.pos += self.vector*0.6
-            self.x, self.y = self.pos
-            self.rotation += self.rotation_velocity
-            self.color += self.color_change_velocity
-            self.map = [
-                    [0, 0],
-                    [self.size, 0],
-                    [self.size, self.size],
-                    [0, self.size]
-                    ]
-            render = self.GetMap()
-            center = self.GetCenter(render)
-            self.render = list(map(lambda line: [(center[0] - line[0]) * cos(radians(self.rotation)) - (center[1] - line[1]) * sin(radians(self.rotation)) + center[0], (center[0] - line[0]) * sin(radians(self.rotation)) + (center[1] - line[1]) * cos(radians(self.rotation)) + center[1]], render))
             canvas.create_polygon(*self.render, fill=f'#{hex(self.color).split("0x")[1] * 3}')
-            if self.color > 204:
-                self.alive = False
+
+    def CreateMove(self):
+        self.size += self.size_transform_velocity / 2
+        self.pos += self.vector*0.6
+        self.x, self.y = self.pos
+        self.rotation += self.rotation_velocity
+        self.color += self.color_change_velocity
+        self.map = [
+                [0, 0],
+                [self.size, 0],
+                [self.size, self.size],
+                [0, self.size]
+                ]
+        render = self.GetMap()
+        center = self.GetCenter(render)
+        self.render = [rotate(self.rotation, *point, *center, *center) for point in render]
+        if self.color > 204:
+            self.alive = False
     
     def GetCenter(self, obj):
         return sum(map(lambda x: np.array(x), obj))/len(obj)
 
     def GetMap(self):
-        return list(map(lambda point: [self.x + point[0], self.y + point[1]], self.map))
+        return list(map(lambda point: [self.pos[0] + point[0], self.pos[1] + point[1]], self.map))
 
 
 class Wheel:
@@ -123,12 +160,12 @@ class Wheel:
         self.rotation = rotation
         center = pos
         render = self.GetMap()
-        self.render = list(map(lambda line: [(center[0] - line[0]) * cos(radians(self.rotation[1])) - (center[1] - line[1]) * sin(radians(self.rotation[1])) + center[0], (center[0] - line[0]) * sin(radians(self.rotation[1])) + (center[1] - line[1]) * cos(radians(self.rotation[1])) + center[1]], render))
+        self.render = [rotate(self.rotation[1], *point, *center, *center) for point in render]
         if self.rotating:
             mp = cos(radians(min(drift_angle, 50)/25*90))
             self.rotation[0] *= mp
             center = self.GetCenter(self.render)
-            self.render = list(map(lambda line: [(center[0] - line[0]) * cos(radians(self.rotation[0])) - (center[1] - line[1]) * sin(radians(self.rotation[0])) + center[0], (center[0] - line[0]) * sin(radians(self.rotation[0])) + (center[1] - line[1]) * cos(radians(self.rotation[0])) + center[1]], self.render))
+            self.render = [rotate(self.rotation[0], *point, *center, *center) for point in self.render]
         canvas.create_polygon(*self.render, fill='#111111')
 
     def GetCenter(self, obj):
@@ -137,4 +174,13 @@ class Wheel:
     def GetMap(self):
         return list(map(lambda point: [self.x + point[0], self.y + point[1]], self.map))
 
+class Bullet:
+    Type = 'bullet'
+    def __init__(self, ID, pos, vector, speed=5) -> None:
+        self.ID = ID
+        self.position = np.array(pos)
+        self.vector = np.array(vector)
+        self.speed = speed
     
+    def CreateMove(self):
+        self.pos += self.vector
