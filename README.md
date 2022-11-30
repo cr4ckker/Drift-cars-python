@@ -4,7 +4,7 @@
 
 **To play this, you need to**:
 1. Download Python 3.*
-2. Install required libraries (pip install -r requirements.txt)
+2. Install required libraries (pip install -r requirements.txt -U)
 3. Launch App.py
 
 If you have any suggestions:

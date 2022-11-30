@@ -1,0 +1,6 @@
+numpy
+tk
+keyboard
+pywin32
+pygame
+numba
