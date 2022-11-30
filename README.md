@@ -8,7 +8,7 @@
 3. Launch App.py
 
 If you have any suggestions:
-Telegram: @cr4ckker
-VK: @cr4ckker
-Discord: CR4CKKER#2187
-Mail: cr4ckker@csgo500.ru
+- Telegram: @cr4ckker
+- VK: @cr4ckker
+- Discord: CR4CKKER#2187
+- Mail: <cr4ckker@csgo500.ru>
