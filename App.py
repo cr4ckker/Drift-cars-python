@@ -8,10 +8,10 @@ from threading import Thread
 
 from math import cos, acos, radians, degrees, sin, sqrt
 
-from models import Car, Smoke
+from models import Car, Smoke, NonCollideTypes
 from funcs import hyp, rotate, GetCenter, GetLines
 
-Objects = [Car(1, [500, 500], 30, 15, speed=5, color='#cc0000'), Car(2, [600, 600], 30, 15, speed=5, keys=['w','s','a','d'], color='#0000cc')]
+Objects = [Car(1, [500, 500], 30, 15, speed=5, color='#cc0000'), Car(2, [600, 600], 30, 15, speed=5, keys=['w','s','a','d', 'space'], color='#0000cc')]
 
 drift_tails = {}
 
@@ -31,7 +31,7 @@ def CreateMove():
     while True:
         for obj in Objects:
             if obj.Type == 'car':
-                obj.CreateMove()
+                obj.CreateMove(Objects)
                 if obj.velocity > 0.001 or obj.velocity < -0.001:
                     try:
                         obj.drift_angle = degrees(acos(np.array(obj.direction).dot(obj.vector) / ((hyp(obj.direction)*hyp(obj.vector)))))
@@ -59,6 +59,14 @@ def CreateMove():
                             drift_tails[obj.ID][-1][1].append(obj.render[1])
                             drift_tails[obj.ID][-1][2].append(obj.render[2])
                             drift_tails[obj.ID][-1][3].append(obj.render[3])
+            elif obj.Type == 'bullet':
+                if not obj.alive:
+                    Objects.remove(obj)
+                    continue
+                obj.CreateMove()
+                for second_object in Objects.copy():
+                    if obj.Collide(second_object):
+                        break
         CreateMove_limiter.tick(144)
         
 def ParticleMove():

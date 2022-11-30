@@ -1,16 +1,18 @@
 import numpy as np
 import numba
-import random, keyboard
+import random, keyboard, time
 
 from math import cos, sin, radians
-from funcs import Normalize, rotate
+from funcs import Normalize, rotate, hyp
 
 direction = np.array([0.0, 1.0])
+NonCollideTypes = ['smoke', 'wheel']
 
 class Car:
     Type = 'car'
-    def __init__(self, ID, pos, length, width, rotation=0, speed=5, keys=['up', 'down', 'left', 'right'], color='#cc0000') -> None:
+    def __init__(self, ID, pos, length, width, rotation=0, speed=5, keys=['up', 'down', 'left', 'right', 'enter'], color='#cc0000') -> None:
         self.ID = ID
+        self.lastshot_time = 0
         self.keys = keys
         self.color = color
         self.x, self.y = pos
@@ -46,11 +48,12 @@ class Car:
         self.render = list(map(lambda point: [self.x + point[0], self.y + point[1]], self.map))
         self.lines = self.GetLines(self.render)
     
-    def CreateMove(self):
+    def CreateMove(self, objects):
         self.vector = Normalize(self.vector*4*self.velocity**2 + self.direction)
         if keyboard.is_pressed('f5'):
             self.pos = np.array([500, 500], dtype='float64')
             self.x, self.y = self.pos
+
         if keyboard.is_pressed(self.keys[0]):
             self.velocity += (self.speed - self.velocity) * 0.01
         if keyboard.is_pressed(self.keys[1]):
@@ -61,8 +64,14 @@ class Car:
         if keyboard.is_pressed(self.keys[3]):
             self.rotation += min(2 * self.velocity/self.speed*1.5, 2)
             self.wheel_angle = min(50 * (abs(self.velocity)/self.speed)*1.5, 50)
+
         if not keyboard.is_pressed(self.keys[3]) and not keyboard.is_pressed(self.keys[2]):
             self.wheel_angle *= 0.9
+
+        if keyboard.is_pressed(self.keys[4]):
+            if time.time() - self.lastshot_time > 1:
+                self.lastshot_time = time.time()
+                objects.append(Bullet(self.ID, self.GetCenter(self.render), self.direction))
         
         if self.velocity > 0.001 or self.velocity < -0.001:
             self.direction = rotate(self.rotation, *direction, *[0,0,0,0])
@@ -176,11 +185,62 @@ class Wheel:
 
 class Bullet:
     Type = 'bullet'
-    def __init__(self, ID, pos, vector, speed=5) -> None:
+    def __init__(self, ID, pos, vector, speed=5, radius=5) -> None:
         self.ID = ID
-        self.position = np.array(pos)
+        self.pos = np.array(pos)
         self.vector = np.array(vector)
         self.speed = speed
+        self.radius = radius
+        self.alive = True
     
     def CreateMove(self):
-        self.pos += self.vector
+        self.pos += self.vector * self.speed
+        if self.pos[0] > 1500 or self.pos[0] < 0 or self.pos[1] < 0 or self.pos[1] > 800:
+            self.alive = False
+            print('dead')
+    
+    def Collide(self, obj):
+        if obj.Type in NonCollideTypes:
+            return False
+        if obj.ID == self.ID:
+            return False
+        if obj.Type == 'car':
+            obj: Car
+            ranges = {}
+            for line in obj.GetLines(obj.render):
+                A, B = line
+
+                d = np.array(A) - np.array(self.pos)
+                n = np.array(Normalize([A[0]-B[0], A[1]-B[1]]))
+                res = d - (d.dot(n))*n
+                xx_yy = [(A[0], B[0]),(A[1], B[1])]
+                final_x, final_y = self.pos[0]+res[0], self.pos[1]+res[1]
+
+                if min(xx_yy[0]) >= final_x:
+                    final_x = min(xx_yy[0])
+                elif max(xx_yy[0]) <= final_x:
+                    final_x = max(xx_yy[0])
+
+                if min(xx_yy[1]) >= final_y:
+                    final_y = min(xx_yy[1])
+                elif max(xx_yy[1]) <= final_y:
+                    final_y = max(xx_yy[1])
+
+                ranges[str(np.math.sqrt((final_x - self.pos[0])**2 + (final_y - self.pos[1])**2))] = [final_x - self.pos[0], final_y - self.pos[1]]
+            closest = min(map(lambda x: float(x), ranges.keys()))
+            if closest < self.radius:
+                self.alive = False
+                obj.velocity = 0.0
+                obj.vector = np.array([0.0, 0.0])
+                return True
+
+        elif obj.Type == 'bullet':
+            if sum((obj.pos - self.pos)**2) < obj.radius**2 + self.radius**2 and self.ID != obj.ID:
+                self.alive = False
+                obj.alive = False
+                return True
+        return False
+    
+    def Render(self, canvas):
+        canvas.create_oval(*self.pos, *self.pos, width=self.radius, fill='#0000cc')
+
