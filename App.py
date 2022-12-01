@@ -43,7 +43,7 @@ def CreateMove():
                         drift_tail_num[obj.ID] = 0
 
                     if drift_tail_num[obj.ID] % 8 == 0 and drift_tail_num[obj.ID] != 0 or drift_tail_num[obj.ID] == 1:
-                        if drift_tail_num[obj.ID] % 8 == 0:
+                        if drift_tail_num[obj.ID] % 8 == 0 and obj.effects.CAR_VELOCITY[0] != 0:
                             Objects.append(Smoke(obj.render[0] + obj.vector * obj.velocity, obj.vector*obj.velocity))
                             Objects.append(Smoke(obj.render[1] + obj.vector * obj.velocity, obj.vector*obj.velocity))
                         if obj.ID not in drift_tails:
@@ -66,6 +66,9 @@ def CreateMove():
                 obj.CreateMove()
                 for second_object in Objects.copy():
                     if obj.Collide(second_object):
+                        if second_object.Type == 'car':
+                            second_object.effects.Give('CAR_SKID', 5.0, 5)
+                            second_object.effects.Give('CAR_VELOCITY', 0, 5)
                         break
         CreateMove_limiter.tick(144)
         
@@ -107,6 +110,7 @@ canvas.place(x=0, y=0)
 Thread(target=CreateMove).start()
 Thread(target=ParticleMove).start()
 final_pos = 0
+Objects[0].effects.Give('BULLET_RADIUS', 10, 10)
 while True:
     window_xy = (window.winfo_rootx(), window.winfo_rooty())
     Render(canvas)
