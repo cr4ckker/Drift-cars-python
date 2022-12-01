@@ -7,12 +7,18 @@ from funcs import Normalize, rotate, hyp
 
 direction = np.array([0.0, 1.0])
 NonCollideTypes = ['smoke', 'wheel']
+EffectNames = ['CAR_SKID',
+            'CAR_SPEED',
+            'CAR_VELOCITY',
+            'BULLET_SPEED',
+            'BULLET_RADIUS']
 
 class Car:
     Type = 'car'
     def __init__(self, ID, pos, length, width, rotation=0, speed=5, keys=['up', 'down', 'left', 'right', 'enter'], color='#cc0000') -> None:
         self.ID = ID
         self.lastshot_time = 0
+        self.effects = Effects()
         self.keys = keys
         self.color = color
         self.x, self.y = pos
@@ -49,15 +55,15 @@ class Car:
         self.lines = self.GetLines(self.render)
     
     def CreateMove(self, objects):
-        self.vector = Normalize(self.vector*4*self.velocity**2 + self.direction)
+        self.effects.Handle()
         if keyboard.is_pressed('f5'):
             self.pos = np.array([500, 500], dtype='float64')
             self.x, self.y = self.pos
 
         if keyboard.is_pressed(self.keys[0]):
-            self.velocity += (self.speed - self.velocity) * 0.01
+            self.velocity += (self.speed * self.effects.CAR_SPEED[0] - self.velocity) * 0.01 * self.effects.CAR_VELOCITY[0]
         if keyboard.is_pressed(self.keys[1]):
-            self.velocity += (-self.speed/3 - self.velocity) * 0.01
+            self.velocity += (-self.speed * self.effects.CAR_SPEED[0] / 3 - self.velocity) * 0.01 * self.effects.CAR_VELOCITY[0]
         if keyboard.is_pressed(self.keys[2]):
             self.rotation -= min(2 * self.velocity/self.speed*1.5, 2)
             self.wheel_angle = max(-50 * (abs(self.velocity)/self.speed)*1.5, -50)
@@ -71,10 +77,11 @@ class Car:
         if keyboard.is_pressed(self.keys[4]):
             if time.time() - self.lastshot_time > 1:
                 self.lastshot_time = time.time()
-                objects.append(Bullet(self.ID, self.GetCenter(self.render), self.direction))
+                objects.append(Bullet(self.ID, self.GetCenter(self.render), self.direction, speed = 5 * self.effects.BULLET_SPEED[0], radius=5 * self.effects.BULLET_RADIUS[0]))
         
         if self.velocity > 0.001 or self.velocity < -0.001:
-            self.direction = rotate(self.rotation, *direction, *[0,0,0,0])
+            self.direction = np.array(rotate(self.rotation, *direction, *[0,0,0,0]))
+            self.vector = Normalize(self.vector * 4 * self.effects.CAR_SKID[0] * self.velocity**2 + self.direction * self.effects.CAR_VELOCITY[0])
             self.velocity *= 0.995
             self.pos += self.vector * self.velocity
             self.x, self.y = self.pos
@@ -230,8 +237,6 @@ class Bullet:
             closest = min(map(lambda x: float(x), ranges.keys()))
             if closest < self.radius:
                 self.alive = False
-                obj.velocity = 0.0
-                obj.vector = np.array([0.0, 0.0])
                 return True
 
         elif obj.Type == 'bullet':
@@ -242,5 +247,18 @@ class Bullet:
         return False
     
     def Render(self, canvas):
-        canvas.create_oval(*self.pos, *self.pos, width=self.radius, fill='#0000cc')
+        canvas.create_oval(*self.pos - [self.radius, self.radius], *self.pos + [self.radius, self.radius], width=0, fill='#0000cc')
 
+class Effects:
+    def __init__(self) -> None:
+        for EffectName in EffectNames:
+            setattr(self, EffectName, [1, 0, 0])
+
+    def Give(self, EffectName, Multiplier, Time):
+        setattr(self, EffectName, [Multiplier, Time, time.time()])
+
+    def Handle(self):
+        for EffectName in EffectNames:
+            EffectData = getattr(self, EffectName)
+            if time.time() - EffectData[2] > EffectData[1]:
+                setattr(self, EffectName, [1, 0, 0])
