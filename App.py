@@ -1,7 +1,7 @@
 import numpy as np
 import tkinter as tk
 import keyboard
-import time, win32api, platform
+import time, platform
 from pygame.time import Clock
 
 from threading import Thread
@@ -18,6 +18,7 @@ drift_tails = {}
 def init():
     global SCREEN_REFRESH_RATE
     if platform.system() == 'Windows':
+        import win32api
         device = win32api.EnumDisplayDevices()
         SCREEN_REFRESH_RATE = win32api.EnumDisplaySettings(device.DeviceName, -1).DisplayFrequency
     else:

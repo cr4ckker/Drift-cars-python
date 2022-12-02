@@ -42,6 +42,7 @@ class Car:
                 ]
 
         self.rotation = rotation
+        self.rotation_velocity = 0
 
         self.speed = speed
         self.vector = np.array([0.0, 0.0])
@@ -65,20 +66,22 @@ class Car:
         if keyboard.is_pressed(self.keys[1]):
             self.velocity += (-self.speed * self.effects.CAR_SPEED[0] / 3 - self.velocity) * 0.01 * self.effects.CAR_VELOCITY[0]
         if keyboard.is_pressed(self.keys[2]):
-            self.rotation -= min(2 * self.velocity/self.speed*1.5, 2)
-            self.wheel_angle = max(-50 * (abs(self.velocity)/self.speed)*1.5, -50)
+            self.rotation_velocity -= 0.06
+            self.wheel_angle = max(-50 * abs(self.rotation_velocity * (self.velocity/self.speed)), -50)
         if keyboard.is_pressed(self.keys[3]):
-            self.rotation += min(2 * self.velocity/self.speed*1.5, 2)
-            self.wheel_angle = min(50 * (abs(self.velocity)/self.speed)*1.5, 50)
+            self.rotation_velocity += 0.06
+            self.wheel_angle = min(50 * abs(self.rotation_velocity * (self.velocity/self.speed)), 50)
 
         if not keyboard.is_pressed(self.keys[3]) and not keyboard.is_pressed(self.keys[2]):
-            self.wheel_angle *= 0.9
+            self.rotation_velocity *= 0.98
+            self.wheel_angle = min(50 * abs(self.rotation_velocity * (self.velocity/self.speed)), 50)
 
         if keyboard.is_pressed(self.keys[4]):
             if time.time() - self.lastshot_time > 1:
                 self.lastshot_time = time.time()
                 objects.append(Bullet(self.ID, self.GetCenter(self.render), self.direction, speed = 5 * self.effects.BULLET_SPEED[0], radius=5 * self.effects.BULLET_RADIUS[0]))
-        
+        self.rotation_velocity = max(min(self.rotation_velocity, 1.5), -1.5)
+        self.rotation += self.rotation_velocity * min(self.velocity/self.speed*1.5, 2)
         if self.velocity > 0.001 or self.velocity < -0.001:
             self.direction = np.array(rotate(self.rotation, *direction, *[0,0,0,0]))
             self.vector = Normalize(self.vector * 4 * self.effects.CAR_SKID[0] * self.velocity**2 + self.direction * self.effects.CAR_VELOCITY[0])
